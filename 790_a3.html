@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ball Paddle Game</title>
+    <style>
+        canvas {
+            border: 1px solid #000;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="gameCanvas" width="640" height="480"></canvas>
+
+<br>
+
+<!-- Controls for customizing the game -->
+<label for="ballCountInput">Number of Balls:</label>
+<input type="number" id="ballCountInput" min="1" value="5" />
+
+<br>
+
+<label for="speedSlider">Ball Speed:</label>
+<input type="range" id="speedSlider" min="1" max="10" value="2" />
+<span id="speedValue">2</span>
+
+<br>
+
+<button id="startButton">Start Game</button>
+
+<script>
+    var canvas = document.getElementById("gameCanvas");
+    var context = canvas.getContext("2d");
+
+    var paddle = {
+        width: 100,
+        height: 20,
+        x: canvas.width / 2 - 50, // Start in the middle of the canvas
+        y: canvas.height - 30, // Position near the bottom
+        speed: 15
+    };
+
+    var balls = [];
+    var ballCount = 5;
+    var ballSpeed = 4;
+
+    var startTime, endTime;
+    var gameRunning = false;
+
+    // Constants for fixed-time step
+    const FPS = 60; // 60 updates per second
+    const FIXED_TIMESTEP = 1000 / FPS; // in milliseconds (16.67ms)
+    var lastUpdateTime = 0;
+    var accumulatedTime = 0;
+
+    // Update ball speed display
+    document.getElementById("speedSlider").addEventListener("input", function() {
+        document.getElementById("speedValue").textContent = this.value;
+    });
+
+    // Update paddle position based on mouse movement
+    canvas.addEventListener('mousemove', function (event) {
+        var rect = canvas.getBoundingClientRect();
+        paddle.x = event.clientX - rect.left - paddle.width / 2;
+    });
+
+    // Function to generate a random color
+    function getRandomColor() {
+        var r = Math.floor(Math.random() * 256);
+        var g = Math.floor(Math.random() * 256);
+        var b = Math.floor(Math.random() * 256);
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    // Normalize a vector
+    function normalizeVector(vx, vy, speed) {
+        var length = Math.sqrt(vx * vx + vy * vy);
+        return {
+            vx: (vx / length) * speed,
+            vy: (vy / length) * speed
+        };
+    }
+
+    // Generate balls based on user input
+    function generateBalls(count, speed) {
+        balls = [];
+        for (var i = 0; i < count; i++) {
+            var velocity_x = (Math.random() * 2 - 1);
+            var velocity_y = (Math.random() * 2 - 1);
+            var normalizedVelocity = normalizeVector(velocity_x, velocity_y, speed);
+
+            balls.push({
+                x: canvas.width / 2,
+                y: canvas.height / 2,
+                velocity_x: normalizedVelocity.vx,
+                velocity_y: normalizedVelocity.vy,
+                radius: 10,
+                color: getRandomColor() // Assign a random color to each ball
+            });
+        }
+    }
+
+    // Start the game
+    document.getElementById('startButton').addEventListener('click', function () {
+        ballSpeed = parseFloat(document.getElementById('speedSlider').value);
+        ballCount = parseInt(document.getElementById('ballCountInput').value);
+        generateBalls(ballCount, ballSpeed);
+        startTime = Date.now();
+        lastUpdateTime = Date.now();
+        accumulatedTime = 0;
+        gameRunning = true;
+        requestAnimationFrame(gameLoop);
+    });
+
+    function gameLoop(timestamp) {
+        if (gameRunning) {
+            var currentTime = Date.now();
+            var deltaTime = currentTime - lastUpdateTime;
+            lastUpdateTime = currentTime;
+
+            accumulatedTime += deltaTime;
+
+            while (accumulatedTime >= FIXED_TIMESTEP) {
+                update(FIXED_TIMESTEP / 1000); // convert ms to seconds for update logic
+                accumulatedTime -= FIXED_TIMESTEP;
+            }
+
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+    }
+
+    function update(deltaTime) {
+        balls.forEach(function (ball, index) {
+            ball.x += ball.velocity_x * deltaTime * FPS; // Adjusted for consistent physics updates
+            ball.y += ball.velocity_y * deltaTime * FPS;
+
+            // Log ball positions to console for debugging
+            console.log(`Ball ${index + 1}: Position (${ball.x.toFixed(2)}, ${ball.y.toFixed(2)})`);
+
+            // Ball bounces off walls
+            if (ball.x < 0 || ball.x > canvas.width) ball.velocity_x *= -1;
+            if (ball.y < 0) ball.velocity_y *= -1;
+
+            // Ball hits paddle
+            if (ball.y + ball.radius >= paddle.y &&
+                ball.x >= paddle.x && ball.x <= paddle.x + paddle.width) {
+                ball.velocity_y *= -1;
+            }
+
+            // Ball falls off screen
+            if (ball.y > canvas.height) {
+                balls.splice(index, 1); // Remove the ball
+            }
+        });
+
+        // End game when no balls are left
+        if (balls.length === 0) {
+            endTime = Date.now();
+            var timeElapsed = (endTime - startTime) / 1000;
+            alert("Game Over! You lasted " + timeElapsed + " seconds.");
+            gameRunning = false;
+        }
+    }
+
+    function draw() {
+        // Clear the canvas
+        context.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw paddle
+        context.fillStyle = "blue";
+        context.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+
+        // Draw balls
+        balls.forEach(function (ball) {
+            context.beginPath();
+            context.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            context.fillStyle = ball.color; // Use the ball's random color
+            context.fill();
+            context.closePath();
+        });
+    }
+</script>
+
+</body>
+</html>
