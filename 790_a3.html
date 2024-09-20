@@ -30,6 +30,9 @@
 
 <button id="startButton">Start Game</button>
 
+<!-- Display the current FPS -->
+<p>FPS: <span id="fpsDisplay">0</span></p>
+
 <script>
     var canvas = document.getElementById("gameCanvas");
     var context = canvas.getContext("2d");
@@ -48,6 +51,14 @@
 
     var startTime, endTime;
     var gameRunning = false;
+
+    var maxFps = 60; // Max FPS allowed
+    function updateFrameRate(newFrameRate) {
+        maxFps = newFrameRate;
+        document.getElementById("FrameRateLabel").innerHTML = maxFps;
+    }
+
+    var frameCount = 0; // Count total number of frames rendered
 
     // Constants for fixed-time step
     const FPS = 60; // 60 updates per second
@@ -111,34 +122,48 @@
         lastUpdateTime = Date.now();
         accumulatedTime = 0;
         gameRunning = true;
-        requestAnimationFrame(gameLoop);
+        requestAnimationFrame(mainLoop);
     });
 
-    function gameLoop(timestamp) {
-        if (gameRunning) {
-            var currentTime = Date.now();
-            var deltaTime = currentTime - lastUpdateTime;
-            lastUpdateTime = currentTime;
+    var fps = 0; // Displayed FPS
+    var framesThisSecond = 0; // Count of frames in the current second
 
-            accumulatedTime += deltaTime;
+    setInterval(function() {
+        fps = framesThisSecond;
+        framesThisSecond = 0;
+        document.getElementById("fpsDisplay").textContent = fps;
+    }, 1000);
 
-            while (accumulatedTime >= FIXED_TIMESTEP) {
-                update(FIXED_TIMESTEP / 1000); // convert ms to seconds for update logic
-                accumulatedTime -= FIXED_TIMESTEP;
-            }
+    var lastFrameTimeMs = 0; // Time of the last frame
+    requestAnimationFrame(mainLoop);
 
-            draw();
-            requestAnimationFrame(gameLoop);
+    function mainLoop(timestamp) {
+        if (!gameRunning) return;
+
+        // Throttle the frame rate based on max FPS
+        if (timestamp < lastFrameTimeMs + (1000 / maxFps)) {
+            requestAnimationFrame(mainLoop);
+            return;
         }
+
+        var delta = timestamp - lastFrameTimeMs;
+        lastFrameTimeMs = timestamp;
+
+        // Update game state
+        update(delta);
+
+        // Render the frame
+        draw();
+
+        framesThisSecond++;
+        requestAnimationFrame(mainLoop);
     }
 
     function update(deltaTime) {
         balls.forEach(function (ball, index) {
-            ball.x += ball.velocity_x * deltaTime * FPS; // Adjusted for consistent physics updates
-            ball.y += ball.velocity_y * deltaTime * FPS;
-
-            // Log ball positions to console for debugging
-            console.log(`Ball ${index + 1}: Position (${ball.x.toFixed(2)}, ${ball.y.toFixed(2)})`);
+            // Update ball positions with fixed timestep
+            ball.x += ball.velocity_x * (deltaTime / FIXED_TIMESTEP); // Adjusted for consistent physics updates
+            ball.y += ball.velocity_y * (deltaTime / FIXED_TIMESTEP);
 
             // Ball bounces off walls
             if (ball.x < 0 || ball.x > canvas.width) ball.velocity_x *= -1;
